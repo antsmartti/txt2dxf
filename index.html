@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Code to DXF Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 90%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: rgba(118, 75, 162, 0.1);
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: rgba(118, 75, 162, 0.15);
+            transform: scale(1.02);
+        }
+
+        .upload-text {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .file-list {
+            margin-top: 20px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            background: rgba(102, 126, 234, 0.15);
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .convert-btn {
+            background: linear-gradient(45deg, #43cea2, #185a9d);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(67, 206, 162, 0.3);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .convert-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(67, 206, 162, 0.4);
+        }
+
+        .convert-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #43cea2, #185a9d);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.1em;
+            color: #666;
+        }
+
+        .download-area {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .download-btn {
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 20px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);
+            margin: 5px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4);
+        }
+
+        .info-box {
+            background: rgba(67, 206, 162, 0.1);
+            border-left: 4px solid #43cea2;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .info-box h3 {
+            color: #185a9d;
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            color: #666;
+            margin-left: 20px;
+        }
+
+        .tool-compensation {
+            background: rgba(240, 147, 251, 0.1);
+            border-left: 4px solid #f093fb;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>G-Code to DXF Converter</h1>
+        <p>Usual workflow generates txt files based on a </p>
+        <div class="info-box">
+            <h3>Supported G-Code Commands:</h3>
+            <ul>
+                <li>G0/G1 - Linear movements (converted to DXF lines)</li>
+                <li>G2 - Clockwise arcs (converted to DXF arcs)</li>
+                <li>G3 - Counterclockwise arcs (converted to DXF arcs)</li>
+                <li>X, Y, Z coordinates</li>
+                <li>I, J arc centers</li>
+                <li>R radius values</li>
+            </ul>
+        </div>
+
+        <div class="tool-compensation">
+            <label for="toolDiameter" style="display: block; margin-bottom: 10px; font-weight: 500; color: #333;">
+                Tool Diameter:
+            </label>
+            <input type="number" id="toolDiameter" step="0.001" min="0" value="0" 
+                   style="width: 120px; padding: 8px; border: 2px solid #ddd; border-radius: 5px; margin-right: 10px;">
+            <span style="color: #666; font-size: 0.9em;">mm (0 = no compensation)</span>
+            <div style="margin-top: 10px; color: #666; font-size: 0.9em;">
+                <strong>Note:</strong> Compensation shows the actual cut path (tool edge) rather than tool center path
+            </div>
+        </div>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-text">
+                Drag and drop your G-code files here or click to browse
+            </div>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Choose Files
+            </button>
+            <input type="file" id="fileInput" class="file-input" multiple accept=".txt,.cnc,.dnc,.nc,.gcode">
+        </div>
+
+        <div class="file-list" id="fileList"></div>
+
+        <button class="convert-btn" id="convertBtn" onclick="convertFiles()" disabled>
+            Convert to DXF
+        </button>
+
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="download-area" id="downloadArea">
+            <h3>Download Converted Files:</h3>
+            <div id="downloadButtons"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+        let convertedFiles = [];
+
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileList = document.getElementById('fileList');
+        const convertBtn = document.getElementById('convertBtn');
+
+        fileInput.addEventListener('change', handleFiles);
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e);
+        });
+
+        function handleFiles(e) {
+            const files = e.target.files || e.dataTransfer.files;
+            selectedFiles = Array.from(files);
+            displayFiles();
+            convertBtn.disabled = selectedFiles.length === 0;
+        }
+
+        function displayFiles() {
+            fileList.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        async function convertFiles() {
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const status = document.getElementById('status');
+            const downloadArea = document.getElementById('downloadArea');
+            const downloadButtons = document.getElementById('downloadButtons');
+            const toolDiameter = parseFloat(document.getElementById('toolDiameter').value) || 0;
+
+            progressBar.style.display = 'block';
+            convertBtn.disabled = true;
+            convertedFiles = [];
+            downloadButtons.innerHTML = '';
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const progress = ((i + 1) / selectedFiles.length) * 100;
+                progressFill.style.width = progress + '%';
+                status.textContent = `Converting ${file.name}...`;
+
+                try {
+                    const gcode = await readFileAsText(file);
+                    const dxf = convertGCodeToDXF(gcode, toolDiameter);
+                    const fileName = file.name.replace(/\.[^/.]+$/, '') + '.dxf';
+                    
+                    convertedFiles.push({
+                        name: fileName,
+                        content: dxf
+                    });
+
+                    // Create download button
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'download-btn';
+                    downloadBtn.textContent = `Download ${fileName}`;
+                    downloadBtn.onclick = () => downloadFile(fileName, dxf);
+                    downloadButtons.appendChild(downloadBtn);
+
+                } catch (error) {
+                    console.error(`Error converting ${file.name}:`, error);
+                    status.textContent = `Error converting ${file.name}`;
+                }
+            }
+
+            status.textContent = `Converted ${convertedFiles.length} files successfully!`;
+            downloadArea.style.display = 'block';
+            convertBtn.disabled = false;
+        }
+
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        function convertGCodeToDXF(gcode, toolDiameter = 0) {
+            const lines = gcode.split('\n');
+            let dxfContent = `  0
+SECTION
+  2
+ENTITIES
+`;
+
+            let currentPos = { x: 0, y: 0, z: 0 };
+            let lastPos = { x: 0, y: 0, z: 0 };
+            let gMode = '0';
+            let lineCounter = 48;
+            const toolRadius = toolDiameter / 2;
+
+            lines.forEach(line => {
+                // Remove comments and convert to uppercase
+                line = line.split('(')[0].trim().toUpperCase();
+                if (!line) return;
+
+                // Parse G-code commands
+                const commands = parseGCodeLine(line);
+                
+                // Update current position and mode
+                if (commands.X !== undefined) currentPos.x = commands.X;
+                if (commands.Y !== undefined) currentPos.y = commands.Y;
+                if (commands.Z !== undefined) currentPos.z = commands.Z;
+                if (commands.G !== undefined) gMode = commands.G.toString();
+
+                // Handle different G-code commands
+                if (gMode === '2' || gMode === '3') {
+                    // Arc commands
+                    if (commands.I !== undefined || commands.J !== undefined || commands.R !== undefined) {
+                        const arcDxf = createArcDXF(lastPos, currentPos, commands, gMode, lineCounter, toolRadius);
+                        dxfContent += arcDxf;
+                        lineCounter++;
+                    }
+                } else if (gMode === '0' || gMode === '1') {
+                    // Linear movement
+                    if (currentPos.x !== lastPos.x || currentPos.y !== lastPos.y || currentPos.z !== lastPos.z) {
+                        const lineDxf = createLineDXF(lastPos, currentPos, lineCounter, toolRadius);
+                        dxfContent += lineDxf;
+                        lineCounter++;
+                    }
+                }
+
+                lastPos = { ...currentPos };
+            });
+
+            dxfContent += `  0
+ENDSEC
+  0
+EOF
+`;
+
+            return dxfContent;
+        }
+
+        function parseGCodeLine(line) {
+            const commands = {};
+            const regex = /([XYZIJRGFSTM])([+-]?\d*\.?\d+)/g;
+            let match;
+
+            while ((match = regex.exec(line)) !== null) {
+                const command = match[1];
+                const value = parseFloat(match[2]);
+                commands[command] = value;
+            }
+
+            return commands;
+        }
+
+        function createLineDXF(start, end, lineNumber, toolRadius = 0) {
+            let offsetStart = start;
+            let offsetEnd = end;
+
+            if (toolRadius > 0) {
+                // Calculate perpendicular offset vector
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                
+                if (length > 0) {
+                    // Perpendicular vector (rotated 90 degrees counterclockwise)
+                    const perpX = -dy / length;
+                    const perpY = dx / length;
+                    
+                    // Apply offset (assuming conventional milling - tool on right side)
+                    offsetStart = {
+                        x: start.x - perpX * toolRadius,
+                        y: start.y - perpY * toolRadius,
+                        z: start.z
+                    };
+                    offsetEnd = {
+                        x: end.x - perpX * toolRadius,
+                        y: end.y - perpY * toolRadius,
+                        z: end.z
+                    };
+                }
+            }
+
+            return `  0
+LINE
+  5
+${lineNumber.toString(16).toUpperCase()}
+100
+AcDbEntity
+  8
+0
+ 62
+     45
+100
+AcDbLine
+ 10
+${offsetStart.x.toFixed(4)}
+ 20
+${offsetStart.y.toFixed(4)}
+ 30
+${offsetStart.z.toFixed(4)}
+ 11
+${offsetEnd.x.toFixed(4)}
+ 21
+${offsetEnd.y.toFixed(4)}
+ 31
+${offsetEnd.z.toFixed(4)}
+`;
+        }
+
+        function createArcDXF(start, end, commands, gMode, lineNumber, toolRadius = 0) {
+            let centerX, centerY, radius;
+
+            if (commands.R !== undefined) {
+                // Calculate center from radius
+                const result = calculateCentersFromRadius(start, end, Math.abs(commands.R));
+                if (result) {
+                    radius = Math.abs(commands.R);
+                    // Choose center based on G-code mode and radius sign
+                    if ((gMode === '2' && commands.R < 0) || (gMode === '3' && commands.R > 0)) {
+                        centerX = result.x2;
+                        centerY = result.y2;
+                    } else {
+                        centerX = result.x1;
+                        centerY = result.y1;
+                    }
+                } else {
+                    return ''; // Invalid arc
+                }
+            } else {
+                // Use I, J offsets
+                centerX = start.x + (commands.I || 0);
+                centerY = start.y + (commands.J || 0);
+                radius = Math.sqrt(Math.pow(centerX - start.x, 2) + Math.pow(centerY - start.y, 2));
+            }
+
+            // Apply tool radius compensation for arcs
+            let compensatedRadius = radius;
+            if (toolRadius > 0) {
+                // For conventional milling:
+                // - Clockwise arcs (G2): tool is on outside, so increase radius
+                // - Counterclockwise arcs (G3): tool is on inside, so decrease radius
+                if (gMode === '2') {
+                    compensatedRadius = radius - toolRadius;
+                } else if (gMode === '3') {
+                    compensatedRadius = radius + toolRadius;
+                }
+                
+                // Ensure radius doesn't go negative
+                if (compensatedRadius < 0) {
+                    compensatedRadius = 0;
+                }
+            }
+
+            const startAngle = calculateAngle(centerX, centerY, start.x, start.y);
+            const endAngle = calculateAngle(centerX, centerY, end.x, end.y);
+
+            let adjustedStartAngle = startAngle;
+            let adjustedEndAngle = endAngle;
+
+            if (gMode === '3') { // Counterclockwise
+                if (adjustedStartAngle >= adjustedEndAngle) {
+                    adjustedEndAngle += 360;
+                }
+            } else { // Clockwise
+                if (adjustedStartAngle <= adjustedEndAngle) {
+                    adjustedEndAngle -= 360;
+                }
+            }
+
+            return `  0
+ARC
+  5
+${lineNumber.toString(16).toUpperCase()}
+100
+AcDbEntity
+  8
+0
+ 62
+     45
+100
+AcDbCircle
+ 10
+${centerX.toFixed(4)}
+ 20
+${centerY.toFixed(4)}
+ 30
+${start.z.toFixed(4)}
+ 40
+${compensatedRadius.toFixed(4)}
+100
+AcDbArc
+ 50
+${(gMode === '2' ? adjustedEndAngle : adjustedStartAngle).toFixed(4)}
+ 51
+${(gMode === '2' ? adjustedStartAngle : adjustedEndAngle).toFixed(4)}
+`;
+        }
+
+        function calculateCentersFromRadius(p1, p2, radius) {
+            const x = p1.x - p2.x;
+            const y = p1.y - p2.y;
+            const d2 = x * x + y * y;
+            const d = Math.sqrt(d2);
+
+            if (2 * radius < d) {
+                return null; // No solution
+            }
+
+            const k1 = (y + x * Math.sqrt(4 * radius * radius / d2 - 1)) / 2;
+            const k2 = (y - x * Math.sqrt(4 * radius * radius / d2 - 1)) / 2;
+            const h1 = (x * x - y * (2 * k1 - y)) / (2 * x);
+            const h2 = (x * x - y * (2 * k2 - y)) / (2 * x);
+
+            return {
+                x1: h1 + p2.x,
+                y1: k1 + p2.y,
+                x2: h2 + p2.x,
+                y2: k2 + p2.y
+            };
+        }
+
+        function calculateAngle(centerX, centerY, pointX, pointY) {
+            const x = pointX - centerX;
+            const y = pointY - centerY;
+            let angle;
+
+            if (x === 0) {
+                angle = y >= 0 ? 90 : 270;
+            } else {
+                angle = Math.atan(y / x) * 180 / Math.PI;
+                if (x < 0) {
+                    angle += 180;
+                } else if (x > 0 && y < 0) {
+                    angle += 360;
+                }
+            }
+
+            return angle;
+        }
+
+        function downloadFile(filename, content) {
+            const blob = new Blob([content], { type: 'application/dxf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
