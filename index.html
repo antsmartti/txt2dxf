@@ -25,8 +25,9 @@
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 40px;
+            margin: 10px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 800px;
+            max-width: 1200px;
             width: 90%;
         }
 
@@ -217,17 +218,7 @@
     <div class="container">
         <h1>G-Code to DXF Converter</h1>
         <p>Usual workflow generates txt files based on a vector drawing. This tool allows you to generate a vector file from your txt file!</p>
-        <div class="info-box">
-            <h3>Supported G-Code Commands:</h3>
-            <ul>
-                <li>G0/G1 - Linear movements (converted to DXF lines)</li>
-                <li>G2 - Clockwise arcs (converted to DXF arcs)</li>
-                <li>G3 - Counterclockwise arcs (converted to DXF arcs)</li>
-                <li>X, Y, Z coordinates</li>
-                <li>I, J arc centers</li>
-                <li>R radius values</li>
-            </ul>
-        </div>
+        
 
         <div class="tool-compensation">
             <label for="toolDiameter" style="display: block; margin-bottom: 10px; font-weight: 500; color: #333;">
@@ -266,6 +257,17 @@
         <div class="download-area" id="downloadArea">
             <h3>Download Converted Files:</h3>
             <div id="downloadButtons"></div>
+        </div>
+        <div class="info-box">
+            <h3>Supported G-Code Commands:</h3>
+            <ul>
+                <li>G0/G1 - Linear movements (converted to DXF lines)</li>
+                <li>G2 - Clockwise arcs (converted to DXF arcs)</li>
+                <li>G3 - Counterclockwise arcs (converted to DXF arcs)</li>
+                <li>X, Y, Z coordinates</li>
+                <li>I, J arc centers</li>
+                <li>R radius values</li>
+            </ul>
         </div>
     </div>
 
@@ -644,4 +646,5 @@ ${(gMode === '2' ? adjustedStartAngle : adjustedEndAngle).toFixed(4)}
     </script>
 </body>
 </html>
+
 
