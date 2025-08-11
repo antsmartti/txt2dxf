@@ -1,6 +1,8 @@
 # txt2dxf
 A browser-based tool for converting a g-code txt file to dxf file
 
+**[🔗 Try it here!](https://antsmartti.github.io/txt2dxf/)**
+
 ## Why?
 Common workflow is to create a drawing in VCarve or Aspire, save the toolpaths to txt and open in Mach, LinuxCNC, etc. The issue is, generating the g-code toolpaths is a one-way operation - you can't import them back and edit the vectors. 
 
