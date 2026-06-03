@@ -272,378 +272,554 @@
     </div>
 
     <script>
-        let selectedFiles = [];
-        let convertedFiles = [];
-
-        // File upload handling
-        const fileInput = document.getElementById('fileInput');
-        const uploadArea = document.getElementById('uploadArea');
-        const fileList = document.getElementById('fileList');
-        const convertBtn = document.getElementById('convertBtn');
-
-        fileInput.addEventListener('change', handleFiles);
-
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            handleFiles(e);
-        });
-
-        function handleFiles(e) {
-            const files = e.target.files || e.dataTransfer.files;
-            selectedFiles = Array.from(files);
-            displayFiles();
-            convertBtn.disabled = selectedFiles.length === 0;
-        }
-
-        function displayFiles() {
-            fileList.innerHTML = '';
-            selectedFiles.forEach((file, index) => {
-                const fileItem = document.createElement('div');
-                fileItem.className = 'file-item';
-                fileItem.innerHTML = `
-                    <span class="file-name">${file.name}</span>
-                    <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
-                `;
-                fileList.appendChild(fileItem);
-            });
-        }
-
-        async function convertFiles() {
-            const progressBar = document.getElementById('progressBar');
-            const progressFill = document.getElementById('progressFill');
-            const status = document.getElementById('status');
-            const downloadArea = document.getElementById('downloadArea');
-            const downloadButtons = document.getElementById('downloadButtons');
-            const toolDiameter = parseFloat(document.getElementById('toolDiameter').value) || 0;
-
-            progressBar.style.display = 'block';
-            convertBtn.disabled = true;
-            convertedFiles = [];
-            downloadButtons.innerHTML = '';
-
-            for (let i = 0; i < selectedFiles.length; i++) {
-                const file = selectedFiles[i];
-                const progress = ((i + 1) / selectedFiles.length) * 100;
-                progressFill.style.width = progress + '%';
-                status.textContent = `Converting ${file.name}...`;
-
-                try {
-                    const gcode = await readFileAsText(file);
-                    const dxf = convertGCodeToDXF(gcode, toolDiameter);
-                    const fileName = file.name.replace(/\.[^/.]+$/, '') + '.dxf';
-                    
-                    convertedFiles.push({
-                        name: fileName,
-                        content: dxf
-                    });
-
-                    // Create download button
-                    const downloadBtn = document.createElement('button');
-                    downloadBtn.className = 'download-btn';
-                    downloadBtn.textContent = `Download ${fileName}`;
-                    downloadBtn.onclick = () => downloadFile(fileName, dxf);
-                    downloadButtons.appendChild(downloadBtn);
-
-                } catch (error) {
-                    console.error(`Error converting ${file.name}:`, error);
-                    status.textContent = `Error converting ${file.name}`;
-                }
-            }
-
-            status.textContent = `Converted ${convertedFiles.length} files successfully!`;
-            downloadArea.style.display = 'block';
-            convertBtn.disabled = false;
-        }
-
-        function readFileAsText(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
-                reader.onerror = reject;
-                reader.readAsText(file);
-            });
-        }
-
-        function convertGCodeToDXF(gcode, toolDiameter = 0) {
-            const lines = gcode.split('\n');
-            let dxfContent = `  0
+let selectedFiles = [];
+let convertedFiles = [];
+ 
+// File upload handling
+const fileInput = document.getElementById('fileInput');
+const uploadArea = document.getElementById('uploadArea');
+const fileList = document.getElementById('fileList');
+const convertBtn = document.getElementById('convertBtn');
+ 
+fileInput.addEventListener('change', handleFiles);
+ 
+uploadArea.addEventListener('dragover', (e) => {
+e.preventDefault();
+uploadArea.classList.add('dragover');
+});
+ 
+uploadArea.addEventListener('dragleave', () => {
+uploadArea.classList.remove('dragover');
+});
+ 
+uploadArea.addEventListener('drop', (e) => {
+e.preventDefault();
+uploadArea.classList.remove('dragover');
+handleFiles(e);
+});
+ 
+function handleFiles(e) {
+const files = e.target.files || e.dataTransfer.files;
+selectedFiles = Array.from(files);
+displayFiles();
+convertBtn.disabled = selectedFiles.length === 0;
+}
+ 
+function displayFiles() {
+fileList.innerHTML = '';
+selectedFiles.forEach((file, index) => {
+const fileItem = document.createElement('div');
+fileItem.className = 'file-item';
+fileItem.innerHTML = `
+<span class="file-name">${file.name}</span>
+<span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
+`;
+fileList.appendChild(fileItem);
+});
+}
+ 
+async function convertFiles() {
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+const status = document.getElementById('status');
+const downloadArea = document.getElementById('downloadArea');
+const downloadButtons = document.getElementById('downloadButtons');
+const toolDiameter = parseFloat(document.getElementById('toolDiameter').value) || 0;
+ 
+progressBar.style.display = 'block';
+convertBtn.disabled = true;
+convertedFiles = [];
+downloadButtons.innerHTML = '';
+ 
+for (let i = 0; i < selectedFiles.length; i++) {
+const file = selectedFiles[i];
+const progress = ((i + 1) / selectedFiles.length) * 100;
+progressFill.style.width = progress + '%';
+status.textContent = `Converting ${file.name}...`;
+ 
+try {
+const gcode = await readFileAsText(file);
+let dxf = convertGCodeToDXF(gcode, toolDiameter);
+// POST-PROCESS: Merge LINE segments into POLYLINE entities
+dxf = mergeLinesIntoPolylines(dxf);
+ 
+const fileName = file.name.replace(/\.[^/.]+$/, '') + '.dxf';
+convertedFiles.push({
+name: fileName,
+content: dxf
+});
+ 
+// Create download button
+const downloadBtn = document.createElement('button');
+downloadBtn.className = 'download-btn';
+downloadBtn.textContent = `Download ${fileName}`;
+downloadBtn.onclick = () => downloadFile(fileName, dxf);
+downloadButtons.appendChild(downloadBtn);
+ 
+} catch (error) {
+console.error(`Error converting ${file.name}:`, error);
+status.textContent = `Error converting ${file.name}`;
+}
+}
+ 
+status.textContent = `Converted ${convertedFiles.length} files successfully!`;
+downloadArea.style.display = 'block';
+convertBtn.disabled = false;
+}
+ 
+function readFileAsText(file) {
+return new Promise((resolve, reject) => {
+const reader = new FileReader();
+reader.onload = (e) => resolve(e.target.result);
+reader.onerror = reject;
+reader.readAsText(file);
+});
+}
+ 
+function mergeLinesIntoPolylines(dxfContent) {
+// Parse DXF to extract LINE entities
+const lines = extractLineEntities(dxfContent);
+ 
+// Group lines into continuous chains
+const polylines = groupLinesIntoChains(lines, 0.2); // 0.2mm tolerance
+// Convert back to DXF
+return replaceLinesWithPolylines(dxfContent, polylines);
+}
+ 
+function extractLineEntities(dxfContent) {
+const lines = [];
+const lineRegex = / 0\s+LINE[\s\S]*?(?= 0\s+(?:LINE|ARC|ENDSEC))/g;
+let match;
+ 
+while ((match = lineRegex.exec(dxfContent)) !== null) {
+const lineStr = match[0];
+const line = parseDXFLine(lineStr);
+if (line) {
+lines.push(line);
+}
+}
+return lines;
+}
+ 
+function parseDXFLine(lineStr) {
+const xStart = extractDXFValue(lineStr, '10');
+const yStart = extractDXFValue(lineStr, '20');
+const zStart = extractDXFValue(lineStr, '30');
+const xEnd = extractDXFValue(lineStr, '11');
+const yEnd = extractDXFValue(lineStr, '21');
+const zEnd = extractDXFValue(lineStr, '31');
+ 
+if (xStart === null || yStart === null || xEnd === null || yEnd === null) {
+return null;
+}
+ 
+return {
+start: { x: xStart, y: yStart, z: zStart || 0 },
+end: { x: xEnd, y: yEnd, z: zEnd || 0 },
+raw: lineStr
+};
+}
+ 
+function extractDXFValue(dxfStr, code) {
+const regex = new RegExp(` ${code}\s+([\d\.\-\+eE]+)`, 'i');
+const match = dxfStr.match(regex);
+return match ? parseFloat(match[1]) : null;
+}
+ 
+function groupLinesIntoChains(lines, tolerance) {
+const chains = [];
+const used = new Set();
+ 
+for (let i = 0; i < lines.length; i++) {
+if (used.has(i)) continue;
+ 
+const chain = [lines[i]];
+used.add(i);
+let lastEnd = lines[i].end;
+ 
+// Find consecutive lines that connect
+let found = true;
+while (found) {
+found = false;
+for (let j = 0; j < lines.length; j++) {
+if (used.has(j)) continue;
+ 
+const dist = Math.sqrt(
+Math.pow(lines[j].start.x - lastEnd.x, 2) +
+Math.pow(lines[j].start.y - lastEnd.y, 2)
+);
+ 
+if (dist < tolerance) {
+chain.push(lines[j]);
+used.add(j);
+lastEnd = lines[j].end;
+found = true;
+break;
+}
+}
+}
+ 
+if (chain.length > 1) {
+chains.push(chain);
+} else {
+// Single line, keep as-is
+chains.push(chain);
+}
+}
+ 
+return chains;
+}
+ 
+function replaceLinesWithPolylines(dxfContent, chains) {
+let result = dxfContent;
+ 
+// Remove all old LINE entities
+const lineRegex = / 0\s+LINE[\s\S]*?(?= 0\s+(?:LINE|ARC|ENDSEC))/g;
+result = result.replace(lineRegex, '');
+ 
+// Build polylines
+let polylinesDXF = '';
+let polylineCounter = 49; // Start numbering after arcs
+ 
+for (let chainIdx = 0; chainIdx < chains.length; chainIdx++) {
+const chain = chains[chainIdx];
+ 
+if (chain.length === 1) {
+// Single line, add as LINE
+polylinesDXF += chain[0].raw;
+} else {
+// Multiple lines, create POLYLINE
+polylinesDXF += createPolylineDXF(chain, polylineCounter);
+polylineCounter++;
+}
+}
+ 
+// Insert polylines before ENDSEC
+result = result.replace(' 0\nENDSEC', polylinesDXF + ' 0\nENDSEC');
+ 
+return result;
+}
+ 
+function createPolylineDXF(chain, polylineNumber) {
+const vertices = [chain[0].start];
+chain.forEach(line => {
+vertices.push(line.end);
+});
+ 
+// Remove duplicate last vertex if it matches first of next
+for (let i = 0; i < vertices.length - 1; i++) {
+const dist = Math.sqrt(
+Math.pow(vertices[i].x - vertices[i + 1].x, 2) +
+Math.pow(vertices[i].y - vertices[i + 1].y, 2)
+);
+if (dist < 0.001) {
+vertices.splice(i + 1, 1);
+i--;
+}
+}
+ 
+let dxf = ` 0
+LWPOLYLINE
+5
+${polylineNumber.toString(16).toUpperCase()}
+100
+AcDbEntity
+8
+0
+62
+45
+100
+AcDbLwPolyline
+90
+${vertices.length}
+70
+0
+`;
+ 
+vertices.forEach(v => {
+dxf += `10
+${v.x.toFixed(4)}
+20
+${v.y.toFixed(4)}
+`;
+});
+ 
+return dxf;
+}
+ 
+function convertGCodeToDXF(gcode, toolDiameter = 0) {
+const lines = gcode.split('\n');
+let dxfContent = ` 0
 SECTION
-  2
+2
 ENTITIES
 `;
-
-            let currentPos = { x: 0, y: 0, z: 0 };
-            let lastPos = { x: 0, y: 0, z: 0 };
-            let gMode = '0';
-            let lineCounter = 48;
-            const toolRadius = toolDiameter / 2;
-
-            lines.forEach(line => {
-                // Remove comments and convert to uppercase
-                line = line.split('(')[0].trim().toUpperCase();
-                if (!line) return;
-
-                // Parse G-code commands
-                const commands = parseGCodeLine(line);
-                
-                // Update current position and mode
-                if (commands.X !== undefined) currentPos.x = commands.X;
-                if (commands.Y !== undefined) currentPos.y = commands.Y;
-                if (commands.Z !== undefined) currentPos.z = commands.Z;
-                if (commands.G !== undefined) gMode = commands.G.toString();
-
-                // Handle different G-code commands
-                if (gMode === '2' || gMode === '3') {
-                    // Arc commands
-                    if (commands.I !== undefined || commands.J !== undefined || commands.R !== undefined) {
-                        const arcDxf = createArcDXF(lastPos, currentPos, commands, gMode, lineCounter, toolRadius);
-                        dxfContent += arcDxf;
-                        lineCounter++;
-                    }
-                } else if (gMode === '1') {
-                    // Linear movement
-                    if (currentPos.x !== lastPos.x || currentPos.y !== lastPos.y || currentPos.z !== lastPos.z) {
-                        const lineDxf = createLineDXF(lastPos, currentPos, lineCounter, toolRadius);
-                        dxfContent += lineDxf;
-                        lineCounter++;
-                    }
-                }
-
-                lastPos = { ...currentPos };
-            });
-
-            dxfContent += `  0
+ 
+let currentPos = { x: 0, y: 0, z: 0 };
+let lastPos = { x: 0, y: 0, z: 0 };
+let gMode = '0';
+let lineCounter = 48;
+ 
+const toolRadius = toolDiameter / 2;
+ 
+lines.forEach(line => {
+// Remove comments and convert to uppercase
+line = line.split('(')[0].trim().toUpperCase();
+ 
+if (!line) return;
+ 
+// Parse G-code commands
+const commands = parseGCodeLine(line);
+ 
+// Update current position and mode
+if (commands.X !== undefined) currentPos.x = commands.X;
+if (commands.Y !== undefined) currentPos.y = commands.Y;
+if (commands.Z !== undefined) currentPos.z = commands.Z;
+if (commands.G !== undefined) gMode = commands.G.toString();
+ 
+// Handle different G-code commands
+if (gMode === '2' || gMode === '3') {
+// Arc commands
+if (commands.I !== undefined || commands.J !== undefined || commands.R !== undefined) {
+const arcDxf = createArcDXF(lastPos, currentPos, commands, gMode, lineCounter, toolRadius);
+dxfContent += arcDxf;
+lineCounter++;
+}
+} else if (gMode === '1') {
+// Linear movement
+if (currentPos.x !== lastPos.x || currentPos.y !== lastPos.y || currentPos.z !== lastPos.z) {
+const lineDxf = createLineDXF(lastPos, currentPos, lineCounter, toolRadius);
+dxfContent += lineDxf;
+lineCounter++;
+}
+}
+ 
+lastPos = { ...currentPos };
+});
+ 
+dxfContent += ` 0
 ENDSEC
-  0
+0
 EOF
 `;
-
-            return dxfContent;
-        }
-
-        function parseGCodeLine(line) {
-            const commands = {};
-            const regex = /([XYZIJRGFSTM])([+-]?\d*\.?\d+)/g;
-            let match;
-
-            while ((match = regex.exec(line)) !== null) {
-                const command = match[1];
-                const value = parseFloat(match[2]);
-                commands[command] = value;
-            }
-
-            return commands;
-        }
-
-        function createLineDXF(start, end, lineNumber, toolRadius = 0) {
-            let offsetStart = start;
-            let offsetEnd = end;
-
-            if (toolRadius > 0) {
-                // Calculate perpendicular offset vector
-                const dx = end.x - start.x;
-                const dy = end.y - start.y;
-                const length = Math.sqrt(dx * dx + dy * dy);
-                
-                if (length > 0) {
-                    // Perpendicular vector (rotated 90 degrees counterclockwise)
-                    const perpX = -dy / length;
-                    const perpY = dx / length;
-                    
-                    // Apply offset (assuming conventional milling - tool on right side)
-                    offsetStart = {
-                        x: start.x - perpX * toolRadius,
-                        y: start.y - perpY * toolRadius,
-                        z: start.z
-                    };
-                    offsetEnd = {
-                        x: end.x - perpX * toolRadius,
-                        y: end.y - perpY * toolRadius,
-                        z: end.z
-                    };
-                }
-            }
-
-            return `  0
+ 
+return dxfContent;
+}
+ 
+function parseGCodeLine(line) {
+const commands = {};
+const regex = /([XYZIJRGFSTM])([+-]?\d*\.?\d+)/g;
+let match;
+ 
+while ((match = regex.exec(line)) !== null) {
+const command = match[1];
+const value = parseFloat(match[2]);
+commands[command] = value;
+}
+ 
+return commands;
+}
+ 
+function createLineDXF(start, end, lineNumber, toolRadius = 0) {
+let offsetStart = start;
+let offsetEnd = end;
+ 
+if (toolRadius > 0) {
+// Calculate perpendicular offset vector
+const dx = end.x - start.x;
+const dy = end.y - start.y;
+const length = Math.sqrt(dx * dx + dy * dy);
+ 
+if (length > 0) {
+// Perpendicular vector (rotated 90 degrees counterclockwise)
+const perpX = -dy / length;
+const perpY = dx / length;
+ 
+// Apply offset (assuming conventional milling - tool on right side)
+offsetStart = {
+x: start.x - perpX * toolRadius,
+y: start.y - perpY * toolRadius,
+z: start.z
+};
+offsetEnd = {
+x: end.x - perpX * toolRadius,
+y: end.y - perpY * toolRadius,
+z: end.z
+};
+}
+}
+ 
+return ` 0
 LINE
-  5
+5
 ${lineNumber.toString(16).toUpperCase()}
 100
 AcDbEntity
-  8
+8
 0
- 62
-     45
+62
+45
 100
 AcDbLine
- 10
+10
 ${offsetStart.x.toFixed(4)}
- 20
+20
 ${offsetStart.y.toFixed(4)}
- 30
+30
 ${offsetStart.z.toFixed(4)}
- 11
+11
 ${offsetEnd.x.toFixed(4)}
- 21
+21
 ${offsetEnd.y.toFixed(4)}
- 31
+31
 ${offsetEnd.z.toFixed(4)}
 `;
-        }
-
-        function createArcDXF(start, end, commands, gMode, lineNumber, toolRadius = 0) {
-            let centerX, centerY, radius;
-
-            if (commands.R !== undefined) {
-                // Calculate center from radius
-                const result = calculateCentersFromRadius(start, end, Math.abs(commands.R));
-                if (result) {
-                    radius = Math.abs(commands.R);
-                    // Choose center based on G-code mode and radius sign
-                    if ((gMode === '2' && commands.R < 0) || (gMode === '3' && commands.R > 0)) {
-                        centerX = result.x2;
-                        centerY = result.y2;
-                    } else {
-                        centerX = result.x1;
-                        centerY = result.y1;
-                    }
-                } else {
-                    return ''; // Invalid arc
-                }
-            } else {
-                // Use I, J offsets
-                centerX = start.x + (commands.I || 0);
-                centerY = start.y + (commands.J || 0);
-                radius = Math.sqrt(Math.pow(centerX - start.x, 2) + Math.pow(centerY - start.y, 2));
-            }
-
-            // Apply tool radius compensation for arcs
-            let compensatedRadius = radius;
-            if (toolRadius > 0) {
-                // For conventional milling:
-                // - Clockwise arcs (G2): tool is on outside, so increase radius
-                // - Counterclockwise arcs (G3): tool is on inside, so decrease radius
-                if (gMode === '2') {
-                    compensatedRadius = radius - toolRadius;
-                } else if (gMode === '3') {
-                    compensatedRadius = radius + toolRadius;
-                }
-                
-                // Ensure radius doesn't go negative
-                if (compensatedRadius < 0) {
-                    compensatedRadius = 0;
-                }
-            }
-
-            const startAngle = calculateAngle(centerX, centerY, start.x, start.y);
-            const endAngle = calculateAngle(centerX, centerY, end.x, end.y);
-
-            let adjustedStartAngle = startAngle;
-            let adjustedEndAngle = endAngle;
-
-            if (gMode === '3') { // Counterclockwise
-                if (adjustedStartAngle >= adjustedEndAngle) {
-                    adjustedEndAngle += 360;
-                }
-            } else { // Clockwise
-                if (adjustedStartAngle <= adjustedEndAngle) {
-                    adjustedEndAngle -= 360;
-                }
-            }
-
-            return `  0
+}
+ 
+function createArcDXF(start, end, commands, gMode, lineNumber, toolRadius = 0) {
+let centerX, centerY, radius;
+ 
+if (commands.R !== undefined) {
+// Calculate center from radius
+const result = calculateCentersFromRadius(start, end, Math.abs(commands.R));
+if (result) {
+radius = Math.abs(commands.R);
+// Choose center based on G-code mode and radius sign
+if ((gMode === '2' && commands.R < 0) || (gMode === '3' && commands.R > 0)) {
+centerX = result.x2;
+centerY = result.y2;
+} else {
+centerX = result.x1;
+centerY = result.y1;
+}
+} else {
+return ''; // Invalid arc
+}
+} else {
+// Use I, J offsets
+centerX = start.x + (commands.I || 0);
+centerY = start.y + (commands.J || 0);
+radius = Math.sqrt(Math.pow(centerX - start.x, 2) + Math.pow(centerY - start.y, 2));
+}
+ 
+// Apply tool radius compensation for arcs
+let compensatedRadius = radius;
+if (toolRadius > 0) {
+// For conventional milling:
+// - Clockwise arcs (G2): tool is on outside, so increase radius
+// - Counterclockwise arcs (G3): tool is on inside, so decrease radius
+if (gMode === '2') {
+compensatedRadius = radius - toolRadius;
+} else if (gMode === '3') {
+compensatedRadius = radius + toolRadius;
+}
+ 
+// Ensure radius doesn't go negative
+if (compensatedRadius < 0) {
+compensatedRadius = 0;
+}
+}
+ 
+const startAngle = calculateAngle(centerX, centerY, start.x, start.y);
+const endAngle = calculateAngle(centerX, centerY, end.x, end.y);
+ 
+let adjustedStartAngle = startAngle;
+let adjustedEndAngle = endAngle;
+ 
+if (gMode === '3') { // Counterclockwise
+if (adjustedStartAngle >= adjustedEndAngle) {
+adjustedEndAngle += 360;
+}
+} else { // Clockwise
+if (adjustedStartAngle <= adjustedEndAngle) {
+adjustedEndAngle -= 360;
+}
+}
+ 
+return ` 0
 ARC
-  5
+5
 ${lineNumber.toString(16).toUpperCase()}
 100
 AcDbEntity
-  8
+8
 0
- 62
-     45
+62
+45
 100
 AcDbCircle
- 10
+10
 ${centerX.toFixed(4)}
- 20
+20
 ${centerY.toFixed(4)}
- 30
+30
 ${start.z.toFixed(4)}
- 40
+40
 ${compensatedRadius.toFixed(4)}
 100
 AcDbArc
- 50
+50
 ${(gMode === '2' ? adjustedEndAngle : adjustedStartAngle).toFixed(4)}
- 51
+51
 ${(gMode === '2' ? adjustedStartAngle : adjustedEndAngle).toFixed(4)}
 `;
-        }
-
-        function calculateCentersFromRadius(p1, p2, radius) {
-            const x = p1.x - p2.x;
-            const y = p1.y - p2.y;
-            const d2 = x * x + y * y;
-            const d = Math.sqrt(d2);
-
-            if (2 * radius < d) {
-                return null; // No solution
-            }
-
-            const k1 = (y + x * Math.sqrt(4 * radius * radius / d2 - 1)) / 2;
-            const k2 = (y - x * Math.sqrt(4 * radius * radius / d2 - 1)) / 2;
-            const h1 = (x * x - y * (2 * k1 - y)) / (2 * x);
-            const h2 = (x * x - y * (2 * k2 - y)) / (2 * x);
-
-            return {
-                x1: h1 + p2.x,
-                y1: k1 + p2.y,
-                x2: h2 + p2.x,
-                y2: k2 + p2.y
-            };
-        }
-
-        function calculateAngle(centerX, centerY, pointX, pointY) {
-            const x = pointX - centerX;
-            const y = pointY - centerY;
-            let angle;
-
-            if (x === 0) {
-                angle = y >= 0 ? 90 : 270;
-            } else {
-                angle = Math.atan(y / x) * 180 / Math.PI;
-                if (x < 0) {
-                    angle += 180;
-                } else if (x > 0 && y < 0) {
-                    angle += 360;
-                }
-            }
-
-            return angle;
-        }
-
-        function downloadFile(filename, content) {
-            const blob = new Blob([content], { type: 'application/dxf' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    </script>
+}
+ 
+function calculateCentersFromRadius(p1, p2, radius) {
+const x = p1.x - p2.x;
+const y = p1.y - p2.y;
+const d2 = x * x + y * y;
+const d = Math.sqrt(d2);
+ 
+if (2 * radius < d) {
+return null; // No solution
+}
+ 
+const k1 = (y + x * Math.sqrt(4 * radius * radius / d2 - 1)) / 2;
+const k2 = (y - x * Math.sqrt(4 * radius * radius / d2 - 1)) / 2;
+const h1 = (x * x - y * (2 * k1 - y)) / (2 * x);
+const h2 = (x * x - y * (2 * k2 - y)) / (2 * x);
+ 
+return {
+x1: h1 + p2.x,
+y1: k1 + p2.y,
+x2: h2 + p2.x,
+y2: k2 + p2.y
+};
+}
+ 
+function calculateAngle(centerX, centerY, pointX, pointY) {
+const x = pointX - centerX;
+const y = pointY - centerY;
+ 
+let angle;
+if (x === 0) {
+angle = y >= 0 ? 90 : 270;
+} else {
+angle = Math.atan(y / x) * 180 / Math.PI;
+if (x < 0) {
+angle += 180;
+} else if (x > 0 && y < 0) {
+angle += 360;
+}
+}
+ 
+return angle;
+}
+ 
+function downloadFile(filename, content) {
+const blob = new Blob([content], { type: 'application/dxf' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = filename;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+}
+ 
+</script>
 </body>
 </html>
 
